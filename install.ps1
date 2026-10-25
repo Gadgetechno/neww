@@ -50,6 +50,6 @@ try {
 }
 
 Write-Host "Running..." -ForegroundColor Green
-Start-Process -FilePath $ExePath -WorkingDirectory $TempDir -Wait
+Start-Process -FilePath $ExePath -WorkingDirectory $TempDir
 
 Write-Host "Done." -ForegroundColor Green
